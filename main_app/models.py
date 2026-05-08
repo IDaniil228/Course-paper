@@ -183,6 +183,9 @@ class CitationDatabase(models.Model):
     """Модель базы цитирования (Scopus, WoS, РИНЦ и т.д.)"""
     name = models.CharField(max_length=100, unique=True, verbose_name="Название базы")
 
+    def __str__(self):
+        return self.name
+
 class Author(AbstractUser):
     # Поля first_name и last_name уже есть в AbstractUser,
     # мы добавляем только отчество
