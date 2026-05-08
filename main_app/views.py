@@ -111,5 +111,5 @@ def create_article(request):
         # Предзаполним авторов самим пользователем (можно убрать, если не нужно)
         form = ArticleForm(initial={'authors': [request.user]})
         # Журнал не предзаполняем
-
+    print(1)
     return render(request, 'main_app/create_article.html', {'form': form})
