@@ -7,7 +7,7 @@ from .forms import ArticleForm
 from .models import Article, Journal
 from .filters import ArticleFilter
 from django.contrib import messages
-
+from datetime import datetime
 
 def article_list_view(request):
     # Получаем все статьи
@@ -78,9 +78,42 @@ def create_article(request):
     if request.method == 'POST':
         print("POST данные:", request.POST)
         form = ArticleForm(request.POST)
+
         if form.is_valid():
             article = form.save(commit=False)
+            title = request.POST.get('title', '').strip()
+            if not title:
+                form.add_error('title', 'Название статьи обязательно для заполнения')
+            # Проверка заполнения научного направления
+            scientific_field = request.POST.get('scientific_field', '').strip()
+            if not scientific_field:
+                form.add_error('scientific_field', 'Научное направление обязательно для заполнения')
 
+            # Проверка заполнения DOI (необязательное поле)
+            doi = request.POST.get('doi', '').strip()
+            if not doi:
+                form.add_error('doi', 'Поле DOI обязательно для заполнения')
+            else:
+                if not doi.startswith('10.'):
+                    form.add_error('doi', 'DOI должен начинаться с "10."')
+                elif ' ' in doi:
+                    form.add_error('doi', 'DOI не должен содержать пробелов')
+                elif len(doi) < 4:
+                    form.add_error('doi', 'Слишком короткий DOI')
+            # Проверка заполнения года публикации
+            publish_year = request.POST.get('publish_year')
+            if not publish_year:
+                form.add_error('publish_year', 'Год публикации обязателен для заполнения')
+            else:
+                try:
+                    publish_year = int(publish_year)
+                    current_year = datetime.now().year
+                    if publish_year > current_year:
+                        form.add_error('publish_year', f'Год публикации не может быть больше {current_year}г.')
+                    elif publish_year < 1900:
+                        form.add_error('publish_year', 'Год публикации должен быть не ранее 1900')
+                except ValueError:
+                    form.add_error('publish_year', 'Год публикации должен быть числом')
             # Привязываем журнал по скрытому ID
             journal_id = form.cleaned_data.get('journal_hidden')
             if journal_id:
@@ -91,16 +124,23 @@ def create_article(request):
             else:
                 form.add_error('journal_text', 'Необходимо выбрать журнал')
 
+            # Проверка на заполнение поля для автора
+            author_ids = request.POST.getlist('authors')
+            if not author_ids or all(not author_id for author_id in author_ids):
+                form.add_error('authors', 'Необходимо указать хотя бы одного автора')
+
+            # Проверка на заполнение баз цитирования
+            db_ids = request.POST.getlist('citation_databases')
+            if not db_ids or all(not db_id for db_id in db_ids):
+                form.add_error('citation_databases', 'Необходимо выбрать хотя бы одну базу цитирования')
+
             # Если ошибок не добавилось — сохраняем
             if not form.errors:
                 article.save()
 
-                author_ids = request.POST.getlist('authors')  # ['94']
                 if author_ids:
                     article.authors.set(author_ids)
 
-                # Аналогично для баз цитирования
-                db_ids = request.POST.getlist('citation_databases')
                 if db_ids:
                     article.citation_databases.set(db_ids)
 
@@ -111,5 +151,5 @@ def create_article(request):
         # Предзаполним авторов самим пользователем (можно убрать, если не нужно)
         form = ArticleForm(initial={'authors': [request.user]})
         # Журнал не предзаполняем
-    print(1)
+
     return render(request, 'main_app/create_article.html', {'form': form})
