@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect
 
 from .forms import ArticleForm
-from .models import Article, Journal
+from .models import Article, Journal, CoAuthor
 from .filters import ArticleFilter
 from django.contrib import messages
 from datetime import datetime
@@ -74,82 +74,111 @@ def search_journal(request):
 
 @login_required
 def create_article(request):
-    """Страница создания новой статьи"""
     if request.method == 'POST':
-        print("POST данные:", request.POST)
         form = ArticleForm(request.POST)
 
-        if form.is_valid():
+        # 1. Получаем списки внешних соавторов сразу (они нам нужны для сохранения)
+        co_names = request.POST.getlist('co_full_name[]')
+        co_statuses = request.POST.getlist('co_status[]')
+        co_orgs = request.POST.getlist('co_organization[]')
+
+        # 2. Вызываем is_valid(), чтобы Django заполнил form.errors стандартными ошибками
+        is_django_valid = form.is_valid()
+
+        # 3. РУЧНЫЕ ПРОВЕРКИ (теперь они выполняются ВСЕГДА)
+
+        # Название
+        title = request.POST.get('title', '').strip()
+        if not title:
+            form.add_error('title', 'Название статьи обязательно для заполнения')
+
+        # Научное направление
+        scientific_field = request.POST.get('scientific_field', '').strip()
+        if not scientific_field:
+            form.add_error('scientific_field', 'Научное направление обязательно для заполнения')
+
+        # DOI
+        doi = request.POST.get('doi', '').strip()
+        if not doi:
+            form.add_error('doi', 'Поле DOI обязательно для заполнения')
+        else:
+            if not doi.startswith('10.'):
+                form.add_error('doi', 'DOI должен начинаться с "10."')
+            elif ' ' in doi:
+                form.add_error('doi', 'DOI не должен содержать пробелов')
+
+        # Год
+        publish_year = request.POST.get('publish_year')
+        if not publish_year:
+            form.add_error('publish_year', 'Год публикации обязателен для заполнения')
+        else:
+            try:
+                py = int(publish_year)
+                current_year = datetime.now().year
+                if py > current_year:
+                    form.add_error('publish_year', f'Год не может быть больше {current_year}')
+                elif py < 1900:
+                    form.add_error('publish_year', 'Год должен быть не ранее 1900')
+            except ValueError:
+                form.add_error('publish_year', 'Год должен быть числом')
+
+        # Журнал
+        journal_id = request.POST.get('journal_hidden')
+        if not journal_id:
+            form.add_error('journal_text', 'Необходимо выбрать журнал из списка')
+
+        # Базы цитирования
+        db_ids = request.POST.getlist('citation_databases')
+        if not db_ids:
+            form.add_error('citation_databases', 'Выберите хотя бы одну базу')
+
+        # Авторы (Внутренние + Внешние)
+        author_ids = request.POST.getlist('authors')
+        # Считаем, что автор есть, если выбран либо системный автор, либо добавлен хотя бы один внешний
+        has_external = any(name.strip() for name in co_names)
+        if not author_ids and not has_external:
+            form.add_error('authors', 'Необходимо указать хотя бы одного автора (системного или внешнего)')
+            # 4. ИТОГОВАЯ ПРОВЕРКА: если Django-форма ок И наших ручных ошибок нет
+
+        print("--- ОШИБКИ В КОНСОЛИ ---")
+        print(form.errors)
+        print("------------------------")
+        if is_django_valid and not form.errors:
             article = form.save(commit=False)
-            title = request.POST.get('title', '').strip()
-            if not title:
-                form.add_error('title', 'Название статьи обязательно для заполнения')
-            # Проверка заполнения научного направления
-            scientific_field = request.POST.get('scientific_field', '').strip()
-            if not scientific_field:
-                form.add_error('scientific_field', 'Научное направление обязательно для заполнения')
 
-            # Проверка заполнения DOI (необязательное поле)
-            doi = request.POST.get('doi', '').strip()
-            if not doi:
-                form.add_error('doi', 'Поле DOI обязательно для заполнения')
-            else:
-                if not doi.startswith('10.'):
-                    form.add_error('doi', 'DOI должен начинаться с "10."')
-                elif ' ' in doi:
-                    form.add_error('doi', 'DOI не должен содержать пробелов')
-                elif len(doi) < 4:
-                    form.add_error('doi', 'Слишком короткий DOI')
-            # Проверка заполнения года публикации
-            publish_year = request.POST.get('publish_year')
-            if not publish_year:
-                form.add_error('publish_year', 'Год публикации обязателен для заполнения')
-            else:
-                try:
-                    publish_year = int(publish_year)
-                    current_year = datetime.now().year
-                    if publish_year > current_year:
-                        form.add_error('publish_year', f'Год публикации не может быть больше {current_year}г.')
-                    elif publish_year < 1900:
-                        form.add_error('publish_year', 'Год публикации должен быть не ранее 1900')
-                except ValueError:
-                    form.add_error('publish_year', 'Год публикации должен быть числом')
-            # Привязываем журнал по скрытому ID
-            journal_id = form.cleaned_data.get('journal_hidden')
-            if journal_id:
-                try:
-                    article.journal = Journal.objects.get(pk=journal_id)
-                except Journal.DoesNotExist:
-                    form.add_error('journal_hidden', 'Выбранный журнал не найден')
-            else:
-                form.add_error('journal_text', 'Необходимо выбрать журнал')
+            # Привязываем журнал
+            try:
+                article.journal = Journal.objects.get(pk=journal_id)
+            except:
+                form.add_error('journal_text', 'Ошибка привязки журнала')
+                return render(request, 'main_app/create_article.html', {'form': form})
 
-            # Проверка на заполнение поля для автора
-            author_ids = request.POST.getlist('authors')
-            if not author_ids or all(not author_id for author_id in author_ids):
-                form.add_error('authors', 'Необходимо указать хотя бы одного автора')
+            article.save()  # Сохраняем статью
 
-            # Проверка на заполнение баз цитирования
-            db_ids = request.POST.getlist('citation_databases')
-            if not db_ids or all(not db_id for db_id in db_ids):
-                form.add_error('citation_databases', 'Необходимо выбрать хотя бы одну базу цитирования')
+            # Сохраняем Many-to-Many поля
+            if author_ids:
+                article.authors.set(author_ids)
+            if db_ids:
+                article.citation_databases.set(db_ids)
 
-            # Если ошибок не добавилось — сохраняем
-            if not form.errors:
-                article.save()
+            # Сохраняем внешних соавторов
+            for i in range(len(co_names)):
+                if co_names[i].strip():
+                    current_org = None
+                    if i < len(co_orgs):
+                        current_org = co_orgs[i] if co_statuses[i] == 'external' else None
 
-                if author_ids:
-                    article.authors.set(author_ids)
+                    CoAuthor.objects.create(
+                        article=article,
+                        full_name=co_names[i],
+                        status=co_statuses[i],
+                        organization=current_org
+                    )
 
-                if db_ids:
-                    article.citation_databases.set(db_ids)
-
-                messages.success(request, 'Статья успешно создана!')
-                return redirect('profile')
+            messages.success(request, 'Статья успешно создана!')
+            return redirect('profile')
 
     else:
-        # Предзаполним авторов самим пользователем (можно убрать, если не нужно)
         form = ArticleForm(initial={'authors': [request.user]})
-        # Журнал не предзаполняем
 
     return render(request, 'main_app/create_article.html', {'form': form})

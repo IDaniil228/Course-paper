@@ -214,6 +214,54 @@ class Author(AbstractUser):
         verbose_name="Google Scholar ID"
     )
 
+class CoAuthor(models.Model):
+    # Константы для выбора статуса
+    STATUS_CHOICES = [
+        ('bachelor', 'Бакалавр'),
+        ('master', 'Магистрант'),
+        ('postgraduate', 'Аспирант'),
+        ('external', 'Внешний соавтор'),
+    ]
+
+    # Полное имя (ФИО) — не может быть пустым
+    full_name = models.CharField(
+        max_length=450,
+        verbose_name="ФИО соавтора",
+        help_text="Введите фамилию, имя и отчество"
+    )
+
+    article = models.ForeignKey(
+        'Article',
+        on_delete=models.CASCADE,
+        related_name="coauthors",
+        verbose_name="Статья"
+    )
+
+    # Статус — не может быть пустым, выбирается из списка
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        verbose_name="Статус",
+        help_text="Укажите роль соавтора"
+    )
+
+    # Организация — может быть пустой
+    organization = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name="Организация",
+        help_text="Место работы или учебы"
+    )
+
+    class Meta:
+        verbose_name = "Соавтор"
+        verbose_name_plural = "Соавторы"
+
+    def __str__(self):
+        # Отображение в админке: Имя (Статус)
+        return f"{self.full_name} ({self.get_status_display()})"
+
 
 class Article(models.Model):
     """Модель научной статьи"""
@@ -282,3 +330,4 @@ class Article(models.Model):
     class Meta:
         verbose_name = "Статья"
         verbose_name_plural = "Статьи"
+

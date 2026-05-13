@@ -31,8 +31,7 @@ class ArticleForm(forms.ModelForm):
         model = Article
         fields = [
             'title', 'publish_year', 'full_biblio_description',
-            'doi', 'scientific_field', 'total_authors_count',
-            'with_foreign_authors'
+            'doi', 'scientific_field'
         ]
         labels = {
             'title': 'Название статьи',
@@ -52,4 +51,4 @@ class ArticleForm(forms.ModelForm):
         if obj.patronymic:
             parts.append(obj.patronymic)
         full_name = ' '.join(parts)
-        return f"{full_name} ({obj.username})"
+        return f"{full_name}"

@@ -1,6 +1,6 @@
 from django.core.management import BaseCommand
 from django.utils.dateparse import parse_date
-from main_app.models import Journal, Author  # ЗАМЕНИТЕ your_app на ваше приложение
+from main_app.models import Journal, Author
 
 
 class Command(BaseCommand):

@@ -138,21 +138,50 @@
     <div class="form-field">
         <label>DOI</label>
         {{ form.doi }}
+        {{ form.doi.errors }}
     </div>
     <div class="form-field">
         <label>Библиографическое описание (необязательно)</label>
         {{ form.full_biblio_description }}
     </div>
-    <div style="display: flex; gap: 20px;">
-        <div class="form-field">
-            <label>Общее число авторов</label>
-            {{ form.total_authors_count }}
+
+    <!-- Блок для внешних соавторов -->
+<div class="form-field">
+    <label>Внешние соавторы (студенты, коллеги из других вузов)</label>
+    <div id="co-authors-container">
+        <!-- Сюда будут добавляться блоки с соавторами -->
+    </div>
+    <button type="button" id="add-co-author-btn" style="background: #10b981; margin-top: 10px;">
+        + Добавить соавтора
+    </button>
+</div>
+
+<!-- Скрытый шаблон для копирования (чтобы не писать HTML в JS) -->
+<template id="co-author-template">
+    <div class="co-author-row" style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 10px; position: relative; background: #f8fafc;">
+        <button type="button" class="remove-co-btn" style="position: absolute; right: 10px; top: 10px; background: #ef4444; padding: 5px 10px; font-size: 12px;">Удалить</button>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <label>ФИО соавтора</label>
+                <input type="text" name="co_full_name[]" required placeholder="Иванов Иван Иванович">
+            </div>
+            <div>
+                <label>Статус</label>
+                <select name="co_status[]" class="co-status-select" required>
+                    <option value="bachelor">Бакалавр</option>
+                    <option value="master">Магистрант</option>
+                    <option value="postgraduate">Аспирант</option>
+                    <option value="external">Внешний соавтор</option>
+                </select>
+            </div>
         </div>
-        <div class="form-field">
-            <label>С иностранными авторами?</label>
-            {{ form.with_foreign_authors }}
+        <div style="margin-top: 10px;" class="org-field-wrapper">
+            <label>Организация</label>
+            <input type="text" name="co_organization[]" placeholder="Укажите вуз или компанию" readonly style="background: #e2e8f0;">
         </div>
     </div>
+</template>
 
     <button type="submit">Сохранить статью</button>
 </form>
@@ -209,6 +238,36 @@ $(function() {
     if (initialJournalId) {
         // Можно сделать запрос, чтобы подставить название, или оставить как есть
     }
+});
+
+
+$(function() {
+    // ... ваш существующий код для Select2 и Autocomplete ...
+
+    const container = $('#co-authors-container');
+    const template = $('#co-author-template').html();
+
+    // Добавление нового блока
+    $('#add-co-author-btn').click(function() {
+        container.append(template);
+    });
+
+    // Удаление блока
+    container.on('click', '.remove-co-btn', function() {
+        $(this).closest('.co-author-row').remove();
+    });
+
+    // Логика поля "Организация"
+    container.on('change', '.co-status-select', function() {
+        const row = $(this).closest('.co-author-row');
+        const orgInput = row.find('input[name="co_organization[]"]');
+
+        if ($(this).val() === 'external') {
+            orgInput.prop('readOnly', false).css('background', 'white').attr('required', true);
+        } else {
+            orgInput.prop('readOnly', true).css('background', '#e2e8f0').val('').removeAttr('required');
+        }
+    });
 });
 </script>
 
