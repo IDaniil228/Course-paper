@@ -136,6 +136,10 @@
         {{ form.scientific_field }}
     </div>
     <div class="form-field">
+        <label>Ключевые слова</label>
+        {{ form.keyword }}
+    </div>
+    <div class="form-field">
         <label>DOI</label>
         {{ form.doi }}
         {{ form.doi.errors }}
@@ -229,6 +233,11 @@ $(function() {
     });
     $('.select2-databases').select2({
         placeholder: "Выберите базы цитирования",
+        allowClear: true,
+        width: '100%'
+    });
+    $('.select2-scientific').select2({
+        placeholder: "Выберите направление",
         allowClear: true,
         width: '100%'
     });

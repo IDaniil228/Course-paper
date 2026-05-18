@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Новый автор</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 30px 40px;
+            color: #1e293b;
+        }
+        h1 {
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+        form {
+            background: white;
+            padding: 32px;
+            border-radius: 16px;
+            max-width: 800px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        }
+        .section-title {
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f1f5f9;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-field {
+            margin-bottom: 16px;
+        }
+        .full-width {
+            grid-column: span 2;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #334155;
+            font-size: 0.9rem;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .checkbox-wrapper input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #4338ca;
+        }
+        .errorlist {
+            color: #b91c1c;
+            list-style: none;
+            padding: 0;
+            margin: 4px 0 0;
+            font-size: 0.85rem;
+        }
+        .success-msg {
+            background: #dcfce7;
+            color: #166534;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #bbf7d0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Добавление нового автора</h1>
+
+{% if messages %}
+    {% for msg in messages %}
+        <div class="success-msg">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="section-title">Персональные данные (Обязательно)</div>
+
+    <div class="form-grid">
+        <div class="form-field">
+            <label>{{ form.last_name.label }} *</label>
+            {{ form.last_name }}
+            {{ form.last_name.errors }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.first_name.label }} *</label>
+            {{ form.first_name }}
+            {{ form.first_name.errors }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.patronymic.label }} *</label>
+            {{ form.patronymic }}
+            {{ form.patronymic.errors }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.username.label }} *</label>
+            {{ form.username }}
+            {{ form.username.errors }}
+        </div>
+        <div class="form-field full-width">
+            <label>{{ form.password.label }} *</label>
+            {{ form.password }}
+            {{ form.password.errors }}
+        </div>
+    </div>
+
+    <div class="section-title">Научные идентификаторы (Необязательно)</div>
+
+    <div class="form-grid">
+        <div class="form-field">
+            <label>{{ form.researcher_id.label }}</label>
+            {{ form.researcher_id }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.scopus_id.label }}</label>
+            {{ form.scopus_id }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.orcid.label }}</label>
+            {{ form.orcid }}
+        </div>
+        <div class="form-field">
+            <label>{{ form.google_scholar.label }}</label>
+            {{ form.google_scholar }}
+        </div>
+    </div>
+
+    <div class="section-title">Настройки доступа</div>
+
+    <div class="checkbox-wrapper">
+        {{ form.is_admin }}
+        <label for="{{ form.is_admin.id_for_label }}" style="margin-bottom: 0;">{{ form.is_admin.label }}</label>
+    </div>
+
+    <button type="submit">Зарегистрировать автора</button>
+</form>
+
+</body>
+</html>

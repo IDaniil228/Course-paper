@@ -82,6 +82,28 @@
             color: #b91c1c;
         }
 
+        .other_btn {
+            background: white;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .other_btn:hover {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            color: #15803d;
+        }
+
         .messages {
             list-style: none;
             margin-bottom: 24px;
@@ -229,7 +251,11 @@
     <div class="articles-section">
         <h2>Ваши публикации</h2>
         <div class="article-count">{{ articles.count }} статей</div>
-        <a href="{% url 'create_article' %}" style="...">+ Добавить статью</a>
+        <a href="{% url 'create_article' %}" class="other_btn">+ Добавить статью</a>
+        {% if user.is_admin %}
+            <a href="{% url 'article_list' %}" class="other_btn">Посмотреть список статей</a>
+            <a href="{% url 'create_author' %}" class="other_btn">Зарегистрировать преподавателя</a>
+        {% endif %}
         {% if articles %}
         <div class="table-wrapper">
             <table>

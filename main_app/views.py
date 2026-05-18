@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 
-from .forms import ArticleForm
+from .forms import ArticleForm, AuthorForm
 from .models import Article, Journal, CoAuthor
 from .filters import ArticleFilter
 from django.contrib import messages
@@ -182,3 +182,25 @@ def create_article(request):
         form = ArticleForm(initial={'authors': [request.user]})
 
     return render(request, 'main_app/create_article.html', {'form': form})
+
+
+def add_author_view(request):
+    if request.method == 'POST':
+        form = AuthorForm(request.POST)
+        if form.is_valid():
+            # Создаем объект автора, но не сохраняем в базу сразу
+            author = form.save(commit=False)
+
+            # ВАЖНО: Хэшируем пароль (чтобы он не лежал в базе открытым текстом)
+            password = form.cleaned_data['password']
+            author.set_password(password)
+
+            # Теперь сохраняем окончательно
+            author.save()
+
+            messages.success(request, f'Автор {author.get_full_name()} успешно добавлен!')
+            return redirect('profile')  # Перенаправляем на ту же страницу или на список
+    else:
+        form = AuthorForm()
+
+    return render(request, 'main_app/create_author.html', {'form': form})
