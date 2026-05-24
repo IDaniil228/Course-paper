@@ -8,17 +8,145 @@ from .models import Article, Journal, CoAuthor
 from .filters import ArticleFilter
 from django.contrib import messages
 from datetime import datetime
+import openpyxl
+from django.http import HttpResponse
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.utils import get_column_letter
+from .models import Article, CitationDatabase  # Импортируй модель баз!
+
 
 def article_list_view(request):
-    # Получаем все статьи
-    queryset = Article.objects.all().select_related('journal').prefetch_related('authors', 'citation_databases')
-
-    # Применяем фильтр из GET-запроса
+    queryset = Article.objects.all()
     f = ArticleFilter(request.GET, queryset=queryset)
 
-    return render(request, 'main_app/article_list.html', {'filter': f})
+    # ОБЯЗАТЕЛЬНО: получаем базы, чтобы они отобразились в модальном окне
+    all_databases = CitationDatabase.objects.all()
 
+    return render(request, 'main_app/article_list.html', {
+        'filter': f,
+        'all_databases': all_databases  # Передаем в шаблон
+    })
+def export_articles_excel(request):
+    # 1. Получаем данные из параметров модального окна
+    year = request.GET.get('year')
+    db_id = request.GET.get('database')
+    level = request.GET.get('level')
 
+    # 2. Базовый запрос с оптимизацией (select_related и prefetch_related)
+    articles_qs = Article.objects.all().select_related('journal').prefetch_related(
+        'authors', 'citation_databases', 'coauthors'
+    )
+
+    # 3. Фильтрация
+    if year and year.strip():
+        articles_qs = articles_qs.filter(publish_year=year)
+    if db_id and db_id.strip():
+        articles_qs = articles_qs.filter(citation_databases__id=db_id)
+    if level and level.strip():
+        articles_qs = articles_qs.filter(journal__level=level)
+
+    # 4. Создаем Excel книгу
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Научный отчет"
+
+    # --- ОПРЕДЕЛЯЕМ СТИЛИ (как на скриншоте) ---
+    thin_side = Side(style='thin')
+    border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    header_fill = PatternFill(start_color="D9EAD3", end_color="D9EAD3", fill_type="solid")  # Салатовый
+    number_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")  # Светло-салатовый
+
+    header_font = Font(bold=True, size=10)
+    base_alignment = Alignment(vertical='top', wrap_text=True, horizontal='left')
+    center_alignment = Alignment(vertical='top', wrap_text=True, horizontal='center')
+
+    # 5. ШАПКА ТАБЛИЦЫ (Названия колонок)
+    headers = [
+        "Статья (полное библиографическое описание)",  # 1
+        "Авторский перевод названия",  # 2
+        "База цитирования",  # 3
+        "Идентификатор DOI",  # 4
+        "Наименование издания (журнала)",  # 5
+        "Направление (область науки)",  # 6
+        "Приоритетное направление КФУ",  # 7
+        "Авторы сотрудники",  # 8
+        "из них (статус)",  # 9
+        "Другие авторы (внешние/студенты)",  # 10
+        "Наименование организации"  # 11
+    ]
+    ws.append(headers)
+
+    # 6. ВТОРАЯ СТРОКА (Нумерация колонок 1, 2, 3...)
+    ws.append([i for i in range(1, len(headers) + 1)])
+
+    # Применяем стили к шапке
+    for row_idx in [1, 2]:
+        for cell in ws[row_idx]:
+            cell.font = header_font
+            cell.border = border
+            cell.alignment = center_alignment
+            cell.fill = header_fill if row_idx == 1 else number_fill
+
+    # 7. ЗАПОЛНЕНИЕ ДАННЫМИ
+    for article in articles_qs:
+        # Сбор внутренних авторов
+        internal_authors = "\n".join([f"{a.last_name} {a.first_name}" for a in article.authors.all()])
+
+        # Сбор баз цитирования
+        dbs = ", ".join([db.name for db in article.citation_databases.all()])
+
+        # Сбор внешних авторов и организаций (модель CoAuthor)
+        ext_list = article.coauthors.all()
+        external_names = "\n".join([ca.full_name for ca in ext_list])
+        external_orgs = "\n".join(list(set([ca.organization for ca in ext_list if ca.organization])))
+
+        # Сбор статусов (пример логики)
+        statuses = "\n".join(["сотрудник" for _ in article.authors.all()])
+
+        # Формируем библиографическую строку
+        biblio = article.full_biblio_description
+        if not biblio:
+            j_title = article.journal.title if article.journal else "—"
+            biblio = f"{article.title} // {j_title}. — {article.publish_year}."
+
+        row_data = [
+            biblio,  # 1
+            "—",  # 2 (заглушка)
+            dbs,  # 3
+            article.doi or "—",  # 4
+            article.journal.title if article.journal else "—",  # 5
+            article.scientific_field or "—",  # 6
+            "—",  # 7 (заглушка)
+            internal_authors,  # 8
+            statuses,  # 9
+            external_names,  # 10
+            external_orgs  # 11
+        ]
+        ws.append(row_data)
+
+        # Применяем стили к ячейкам текущей строки
+        for cell in ws[ws.max_row]:
+            cell.border = border
+            cell.alignment = base_alignment
+
+    # 8. НАСТРОЙКА ШИРИНЫ КОЛОНОК (чтобы было красиво)
+    widths = [50, 25, 15, 25, 30, 25, 20, 25, 15, 25, 30]
+    for i, width in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+
+    # 9. ФИКСАЦИЯ ШАПКИ
+    ws.freeze_panes = "A3"
+
+    # 10. ФОРМИРОВАНИЕ ОТВЕТА
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    response['Content-Disposition'] = f'attachment; filename="Scientific_Report_{timestamp}.xlsx"'
+
+    wb.save(response)
+    return response
 def user_login(request):
     """Авторизация пользователя (только вход, без регистрации)"""
     # Если пользователь уже вошёл, сразу на профиль

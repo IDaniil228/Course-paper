@@ -8,5 +8,6 @@ urlpatterns = [
     path('profile/', views.profile, name='profile'),
     path('api/journal-search/', views.search_journal, name='journal_search'),
     path('article/create/', views.create_article, name='create_article'),
+    path('export/excel/', views.export_articles_excel, name='export_excel'),
     path('author/create/', views.add_author_view, name='create_author'),
 ]
